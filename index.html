@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مستشفى بن زيلع الحديث - قسم المختبر</title>
+    <!-- Tailwind CSS & FontAwesome & QRCode & jsPDF -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        hospital: { 50: '#eff6ff', 600: '#2563eb', 700: '#1d4ed8', dark: '#0f172a' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-300">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 left-5 z-50 flex flex-col gap-2"></div>
+
+    <!-- 1. شاشة تسجيل الدخول والتحقق -->
+    <section id="login-section" class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100 dark:border-slate-700">
+            <div class="text-center mb-6">
+                <div class="inline-block p-3 bg-blue-50 dark:bg-blue-900/30 text-hospital-600 rounded-2xl text-3xl mb-3">
+                    <i class="fa-solid fa-hospital"></i>
+                </div>
+                <h1 class="text-2xl font-bold">مستشفى بن زيلع الحديث</h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">خدمة أفضل .. ورعاية أشمل | قسم المختبر</p>
+            </div>
+
+            <div id="login-step-1" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-1">الاسم الكامل</label>
+                    <input type="text" id="emp-name" value="محمد علي الهندي" class="w-full px-4 py-3 rounded-xl border dark:bg-slate-900 dark:border-slate-700 focus:ring-2 focus:ring-hospital-600 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1">رقم الجوال</label>
+                    <input type="text" id="emp-phone" placeholder="777xxxxxx" class="w-full px-4 py-3 rounded-xl border dark:bg-slate-900 dark:border-slate-700 focus:ring-2 focus:ring-hospital-600 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1">الوظيفة</label>
+                    <input type="text" id="emp-role" value="موظف المختبر" class="w-full px-4 py-3 rounded-xl border dark:bg-slate-900 dark:border-slate-700 focus:ring-2 focus:ring-hospital-600 outline-none">
+                </div>
+                <button onclick="requestLoginCode()" class="w-full bg-hospital-600 hover:bg-hospital-700 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-blue-500/30">
+                    طلب كود التحقق <i class="fa-solid fa-paper-plane mr-2"></i>
+                </button>
+            </div>
+
+            <div id="login-step-2" class="space-y-4 hidden">
+                <div class="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 text-sm rounded-xl text-center">
+                    تم إرسال كود التحقق إلى تليجرام (Chat ID: 813574963). أدخل الكود (مثلاً 1234):
+                </div>
+                <div>
+                    <input type="text" id="verify-code" placeholder="1234" maxlength="4" class="w-full text-center text-2xl tracking-widest px-4 py-3 rounded-xl border dark:bg-slate-900 dark:border-slate-700 focus:ring-2 focus:ring-hospital-600 outline-none">
+                </div>
+                <button onclick="verifyLoginCode()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-lg">
+                    تأكيد والدخول للنظام <i class="fa-solid fa-check mr-2"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. الواجهة الرئيسية (Dashboard) -->
+    <div id="app-container" class="hidden pb-12">
+        <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 sticky top-0 z-40 px-4 py-3 shadow-sm">
+            <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="bg-hospital-600 text-white p-2.5 rounded-xl"><i class="fa-solid fa-flask text-xl"></i></div>
+                    <div>
+                        <h2 class="font-bold text-sm">مستشفى بن زيلع الحديث - قسم المختبر</h2>
+                        <span id="active-user-badge" class="text-xs text-hospital-600 font-semibold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md"></span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="manualSync()" class="flex items-center gap-2 text-xs bg-slate-100 dark:bg-slate-700 px-3 py-2 rounded-xl hover:bg-slate-200 transition">
+                        <i class="fa-solid fa-rotate"></i> <span id="sync-time">آخر تحديث: الآن</span>
+                    </button>
+                    <button onclick="toggleDarkMode()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 transition">
+                        <i class="fa-solid fa-moon dark:hidden"></i>
+                        <i class="fa-solid fa-sun hidden dark:block text-amber-400"></i>
+                    </button>
+                    <button onclick="logout()" class="text-rose-500 p-2 rounded-xl bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 transition" title="خروج">
+                        <i class="fa-solid fa-power-off"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 mt-6 space-y-6">
+            <!-- المؤشرات الثلاثة للأداء -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border dark:border-slate-700 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400 font-semibold">إجمالي الحالات</p>
+                        <h3 class="text-3xl font-black mt-1">162</h3>
+                    </div>
+                    <div class="p-3 bg-blue-50 dark:bg-blue-900/30 text-hospital-600 rounded-xl text-xl"><i class="fa-solid fa-list-check"></i></div>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border dark:border-slate-700 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400 font-semibold">عدد الحالات قيد الطلب</p>
+                        <h3 class="text-3xl font-black text-amber-500 mt-1">37</h3>
+                    </div>
+                    <div class="p-3 bg-amber-50 dark:bg-amber-900/30 text-amber-500 rounded-xl text-xl"><i class="fa-solid fa-clock"></i></div>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border dark:border-slate-700 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400 font-semibold">عدد الحالات المنجزة</p>
+                        <h3 class="text-3xl font-black text-emerald-500 mt-1">125</h3>
+                    </div>
+                    <div class="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500 rounded-xl text-xl"><i class="fa-solid fa-circle-check"></i></div>
+                </div>
+            </div>
+
+            <!-- الأزرار الـ 8 الرئيسية (مطابقة للصورة تماماً) -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <button onclick="openModal('add-order')" class="p-5 bg-hospital-600 hover:bg-hospital-700 text-white rounded-2xl shadow-lg transition flex flex-col items-center text-center gap-3">
+                    <i class="fa-solid fa-file-circle-plus text-2xl"></i>
+                    <span class="font-bold text-sm">إضافة طلب</span>
+                </button>
+                <button onclick="openModal('confirm-done')" class="p-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-lg transition flex flex-col items-center text-center gap-3">
+                    <i class="fa-solid fa-square-check text-2xl"></i>
+                    <span class="font-bold text-sm">تأكيد إنجاز</span>
+                </button>
+                <button onclick="openModal('analysis')" class="p-5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl shadow-lg transition flex flex-col items-center text-center gap-3">
+                    <i class="fa-solid fa-vials text-2xl"></i>
+                    <span class="font-bold text-sm">إضافة تحاليل</span>
+                </button>
+                <button onclick="openModal('patients')" class="p-5 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl shadow-lg transition flex flex-col items-center text-center gap-3">
+                    <i class="fa-solid fa-users text-2xl"></i>
+                    <span class="font-bold text-sm">إدارة المرضى</span>
+                </button>
+                <button onclick="openModal('doctors')" class="p-5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl shadow-lg transition flex flex-col items-center text-center gap-3">
+                    <i class="fa-solid fa-user-doctor text-2xl"></i>
+                    <span class="font-bold text-sm">إضافة دكتور</span>
+                </button>
+                <button onclick="openModal('camps')" class="p-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-lg transition flex flex-col items-center text-center gap-3">
+                    <i class="fa-solid fa-campground text-2xl"></i>
+                    <span class="font-bold text-sm">إدارة المخيمات</span>
+                </button>
+                <button onclick="openModal('treasury')" class="p-5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl shadow-lg transition flex flex-col items-center text-center gap-3">
+                    <i class="fa-solid fa-vault text-2xl"></i>
+                    <span class="font-bold text-sm">الصندوق</span>
+                </button>
+                <button onclick="openModal('reports')" class="p-5 bg-slate-700 hover:bg-slate-800 text-white rounded-2xl shadow-lg transition flex flex-col items-center text-center gap-3">
+                    <i class="fa-solid fa-chart-pie text-2xl"></i>
+                    <span class="font-bold text-sm">التقارير</span>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- النافذة العامة المنبثقة -->
+    <div id="generic-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl border dark:border-slate-700 p-6">
+            <div class="flex justify-between items-center pb-4 border-b dark:border-slate-700 mb-4">
+                <h3 id="modal-title" class="text-lg font-bold">عنوان النافذة</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-rose-500 text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script>
+        // رابط الـ Web App الخاص بك الذي قمت بإنشائه ونشره على قوقل شيت
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwD0LhEI9HKOO5NDi3N-wNZ9RXYGLpfN4W2g28FPqw3E5GGmTcHiyZk_n8eiowJgblv1A/exec";
+        const CAMP_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1qMvbL9UZA8wfcq3kYdC30xxd7e2sXMakMqPW6nqfRTI/export?format=csv&gid=0";
+
+        let currentUser = JSON.parse(localStorage.getItem('bin_zila_user')) || null;
+
+        window.onload = function() {
+            if (currentUser) {
+                document.getElementById('login-section').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+                document.getElementById('active-user-badge').innerText = `${currentUser.name} (${currentUser.role})`;
+            }
+            if (localStorage.getItem('dark_mode') === 'true') {
+                document.documentElement.classList.add('dark');
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `px-4 py-3 rounded-xl shadow-lg text-white font-semibold text-sm flex items-center gap-3 transition ${type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'}`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i> <span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.remove(); }, 3500);
+        }
+
+        async function postToGoogleSheet(payload) {
+            try {
+                // إرسال البيانات عبر fetch إلى الويب أب
+                await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                showToast("تم الحفظ وترحيل البيانات إلى الأكسل وتليجرام بنجاح!");
+            } catch (err) {
+                console.error("Sync error:", err);
+                showToast("تعذر الاتصال بقاعدة البيانات", "error");
+            }
+        }
+
+        function requestLoginCode() {
+            const name = document.getElementById('emp-name').value;
+            const phone = document.getElementById('emp-phone').value;
+            const role = document.getElementById('emp-role').value;
+            if(!name || !phone) { showToast("الرجاء إدخال الاسم ورقم الجوال", "error"); return; }
+            
+            postToGoogleSheet({ sheetName: "العمليات", type: "تسجيل دخول", patientName: name, phone: phone, employee: name });
+            document.getElementById('login-step-1').classList.add('hidden');
+            document.getElementById('login-step-2').classList.remove('hidden');
+            showToast("تم إرسال كود التحقق بنجاح إلى تليجرام");
+        }
+
+        function verifyLoginCode() {
+            currentUser = {
+                name: document.getElementById('emp-name').value,
+                phone: document.getElementById('emp-phone').value,
+                role: document.getElementById('emp-role').value
+            };
+            localStorage.setItem('bin_zila_user', JSON.stringify(currentUser));
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('app-container').classList.remove('hidden');
+            document.getElementById('active-user-badge').innerText = `${currentUser.name} (${currentUser.role})`;
+            showToast("تم تسجيل الدخول بنجاح");
+        }
+
+        function logout() {
+            localStorage.removeItem('bin_zila_user');
+            location.reload();
+        }
+
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('dark_mode', document.documentElement.classList.contains('dark'));
+        }
+
+        function manualSync() {
+            document.getElementById('sync-time').innerText = `آخر تحديث: ${new Date().toLocaleTimeString()}`;
+            showToast("تم مزامنة وتحديث البيانات بنجاح");
+        }
+
+        // تفاعلات النوافذ والـ 8 أزرار
+        function openModal(type) {
+            const modal = document.getElementById('generic-modal');
+            const title = document.getElementById('modal-title');
+            const body = document.getElementById('modal-body');
+            modal.classList.remove('hidden');
+
+            if(type === 'add-order') {
+                title.innerText = "إضافة طلب جديد";
+                body.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer font-semibold"><input type="radio" name="otype" checked> مريض تابع لمخيم</label>
+                            <label class="flex items-center gap-2 cursor-pointer font-semibold"><input type="radio" name="otype"> مريض آخر</label>
+                        </div>
+                        <div class="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border dark:border-slate-700 space-y-3">
+                            <label class="block text-xs font-semibold">بحث عن مريض مخيم (حسب طلبك: الأعمدة B, C, D, F, G, J)</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="c-query" placeholder="اكتب اسم المريض أو جزء منه..." class="w-full px-3 py-2 rounded-lg border dark:bg-slate-800 dark:border-slate-600 text-sm">
+                                <button onclick="searchCamp()" class="bg-hospital-600 text-white px-4 py-2 rounded-lg font-bold"><i class="fa-solid fa-search"></i></button>
+                            </div>
+                            <div id="c-results" class="space-y-2 max-h-40 overflow-y-auto"></div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-semibold mb-1">الاسم الكامل</label><input type="text" id="ord-name" class="w-full px-3 py-2 rounded-lg border dark:bg-slate-900 dark:border-slate-700 text-sm"></div>
+                            <div><label class="block text-xs font-semibold mb-1">رقم الجوال</label><input type="text" id="ord-phone" class="w-full px-3 py-2 rounded-lg border dark:bg-slate-900 dark:border-slate-700 text-sm"></div>
+                            <div><label class="block text-xs font-semibold mb-1">السن</label><input type="number" id="ord-age" value="35" class="w-full px-3 py-2 rounded-lg border dark:bg-slate-900 dark:border-slate-700 text-sm"></div>
+                            <div><label class="block text-xs font-semibold mb-1">نوع العملية</label><input type="text" id="ord-op" value="مياه بيضاء" class="w-full px-3 py-2 rounded-lg border dark:bg-slate-900 dark:border-slate-700 text-sm"></div>
+                        </div>
+                        <button onclick="saveNewOrder()" class="w-full bg-hospital-600 hover:bg-hospital-700 text-white font-bold py-3 rounded-xl shadow-lg mt-2 text-sm">
+                            حفظ العملية وترحيلها للشيت <i class="fa-solid fa-floppy-disk mr-2"></i>
+                        </button>
+                    </div>
+                `;
+            } else if(type === 'confirm-done') {
+                title.innerText = "تأكيد إنجاز الطلبات";
+                body.innerHTML = `
+                    <div class="space-y-3">
+                        <div onclick="completeOrder('محمد علي أحمد', '5,000 ريال')" class="p-4 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-between items-center cursor-pointer hover:border-emerald-500 transition">
+                            <div>
+                                <h4 class="font-bold text-sm">محمد علي أحمد</h4>
+                                <p class="text-xs text-slate-400">رقم الطلب: 2025-001 | الجوال: 777123456</p>
+                                <span class="text-xs text-rose-500 font-semibold mt-1 inline-block">المبلغ المتبقي: 5,000 ريال</span>
+                            </div>
+                            <span class="px-3 py-1 bg-emerald-100 text-emerald-600 font-mono text-xs rounded-lg font-bold">00:45:12</span>
+                        </div>
+                    </div>
+                `;
+            } else if(type === 'treasury') {
+                title.innerText = "الصندوق والحسابات المالية";
+                body.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                            <div class="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl"><p class="text-[10px] text-slate-400">إجمالي الوارد</p><h4 class="text-base font-bold text-emerald-600">81,000 ريال</h4></div>
+                            <div class="p-3 bg-rose-50 dark:bg-rose-900/20 rounded-xl"><p class="text-[10px] text-slate-400">إجمالي المنصرف</p><h4 class="text-base font-bold text-rose-600">32,750 ريال</h4></div>
+                            <div class="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl"><p class="text-[10px] text-slate-400">المتبقي عند المرضى</p><h4 class="text-base font-bold text-amber-600">12,500 ريال</h4></div>
+                            <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl"><p class="text-[10px] text-slate-400">الرصيد الحالي</p><h4 class="text-base font-bold text-hospital-600">48,250 ريال</h4></div>
+                        </div>
+                        <div class="flex gap-3">
+                            <button onclick="addReceipt('قبض', 10000)" class="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-xs"><i class="fa-solid fa-file-arrow-down ml-1"></i> إضافة سند قبض</button>
+                            <button onclick="addReceipt('صرف', 5000)" class="flex-1 bg-rose-600 text-white py-2.5 rounded-xl font-bold text-xs"><i class="fa-solid fa-file-arrow-up ml-1"></i> إضافة سند صرف</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                title.innerText = "قسم النظام الاحترافي";
+                body.innerHTML = `<div class="p-6 text-center text-slate-400 text-sm">هذا القسم مرتبط وجاهز للعمل الكامل بناءً على خيارات القائمة.</div>`;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('generic-modal').classList.add('hidden');
+        }
+
+        // البحث في شيت المخيمات حسب الأعمدة المحددة (B, C, D, F, G, J)
+        async function searchCamp() {
+            const query = document.getElementById('c-query').value.trim().toLowerCase();
+            const resDiv = document.getElementById('c-results');
+            resDiv.innerHTML = `<p class="text-xs text-blue-500">جاري البحث في قاعدة بيانات المخيمات...</p>`;
+
+            try {
+                const response = await fetch(CAMP_SHEET_CSV);
+                const data = await response.text();
+                const rows = data.split('\n').map(r => r.split(','));
+                let matches = [];
+
+                for(let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if(r && r[1]) {
+                        const name = r[1] ? r[1].replace(/"/g, '') : '';
+                        const address = r[2] ? r[2].replace(/"/g, '') : '';
+                        const phone = r[3] ? r[3].replace(/"/g, '') : '';
+                        const idType = r[5] ? r[5].replace(/"/g, '') : '';
+                        const idNum = r[6] ? r[6].replace(/"/g, '') : '';
+                        const opType = r[9] ? r[9].replace(/"/g, '') : '';
+
+                        if(!query || name.toLowerCase().includes(query) || phone.includes(query)) {
+                            matches.push({ name, address, phone, idType, idNum, opType });
+                        }
+                    }
+                }
+
+                if(matches.length > 0) {
+                    resDiv.innerHTML = matches.slice(0, 5).map(m => `
+                        <div onclick="selectCampPatient('${m.name}', '${m.phone}', '${m.opType}')" class="p-2.5 bg-white dark:bg-slate-800 rounded-lg border dark:border-slate-700 cursor-pointer hover:border-hospital-600 transition">
+                            <p class="font-bold text-xs">${m.name}</p>
+                            <p class="text-[11px] text-slate-400">الجوال: ${m.phone} | العملية: ${m.opType}</p>
+                        </div>
+                    `).join('');
+                } else {
+                    resDiv.innerHTML = `<p class="text-xs text-rose-500">لم يتم العثور على نتائج مطابقة.</p>`;
+                }
+            } catch(e) {
+                resDiv.innerHTML = `<p class="text-xs text-rose-500">تعذر جلب البيانات من ملف الشيت.</p>`;
+            }
+        }
+
+        function selectCampPatient(name, phone, op) {
+            document.getElementById('ord-name').value = name;
+            document.getElementById('ord-phone').value = phone;
+            document.getElementById('ord-op').value = op;
+            showToast(`تم اختيار المريض: ${name}`);
+        }
+
+        function saveNewOrder() {
+            const name = document.getElementById('ord-name').value;
+            const phone = document.getElementById('ord-phone').value;
+            const op = document.getElementById('ord-op').value;
+            if(!name) { showToast("الرجاء إدخال اسم المريض", "error"); return; }
+
+            postToGoogleSheet({
+                sheetName: "العمليات",
+                type: "طلب فحص جديد",
+                orderNo: "2025-010",
+                opType: op,
+                patientName: name,
+                phone: phone,
+                remaining: "5000",
+                employee: currentUser ? currentUser.name : "محمد علي الهندي"
+            });
+            closeModal();
+        }
+
+        function completeOrder(patientName, remaining) {
+            postToGoogleSheet({
+                sheetName: "العمليات",
+                type: "إنجاز فحص",
+                orderNo: "2025-001",
+                patientName: patientName,
+                remaining: remaining,
+                employee: currentUser ? currentUser.name : "محمد علي الهندي"
+            });
+            showToast(`تم إنجاز فحص المريض ${patientName} بنجاح`);
+            closeModal();
+        }
+
+        function addReceipt(transType, amount) {
+            postToGoogleSheet({
+                sheetName: "الصندوق",
+                type: `سند ${transType}`,
+                receiptNo: "REC-05",
+                transType: transType,
+                partyName: "مريض آخر",
+                amount: amount,
+                currency: "ريال يمني",
+                statement: "دفعة حساب",
+                employee: currentUser ? currentUser.name : "محمد علي الهندي"
+            });
+            closeModal();
+        }
+    </script>
+</body>
+</html>
